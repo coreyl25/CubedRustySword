@@ -33,7 +33,6 @@ public class UIManager : MonoBehaviour
         {
             winPanel.SetActive(false);
         }
-        
         if (gameOverPanel != null)
         {
             gameOverPanel.SetActive(false);
@@ -67,12 +66,18 @@ public class UIManager : MonoBehaviour
     // Button functions
     public void RestartGame()
     {
+        // Unpause game first (in case it was paused)
+        Time.timeScale = 1f;
+        
         // Reload the current scene
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
     
     public void LoadMainMenu()
     {
+        // Unpause game first
+        Time.timeScale = 1f;
+        
         // Load the main menu scene
         SceneManager.LoadScene("MainMenu");
     }

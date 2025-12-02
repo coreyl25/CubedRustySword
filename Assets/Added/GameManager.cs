@@ -1,10 +1,15 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager instance;
     
-    public int totalCoins;
+    [Header("Win Condition")]
+    public int totalCoinsInLevel = 0; // Set this to the number of coins in your level
+    private int coinsCollected = 0;
+    
+    private bool gameEnded = false;
     
     void Awake()
     {
@@ -21,34 +26,48 @@ public class GameManager : MonoBehaviour
     
     void Start()
     {
-        // Count all coins in the scene by name
-        GameObject[] allObjects = FindObjectsOfType<GameObject>();
-        int coinCount = 0;
-        
-        foreach (GameObject obj in allObjects)
+        // Auto-count coins if not manually set
+        if (totalCoinsInLevel == 0)
         {
-            if (obj.name.Contains("Coin"))
+            // Count all GameObjects with "Coin" in their name
+            GameObject[] allObjects = FindObjectsOfType<GameObject>();
+            foreach (GameObject obj in allObjects)
             {
-                coinCount++;
+                if (obj.name.Contains("Coin"))
+                {
+                    totalCoinsInLevel++;
+                }
             }
+            Debug.Log("Auto-detected " + totalCoinsInLevel + " coins in level");
         }
-        
-        totalCoins = coinCount;
-        Debug.Log("Total coins in level: " + totalCoins);
     }
     
-    public void CheckWinCondition(int currentScore)
+    public void CoinCollected()
     {
-        // Check if player collected all coins
-        if (currentScore >= totalCoins)
+        if (gameEnded) return;
+        
+        coinsCollected++;
+        Debug.Log("Coins collected: " + coinsCollected + "/" + totalCoinsInLevel);
+        
+        // Check if all coins collected
+        if (coinsCollected >= totalCoinsInLevel)
         {
             WinGame();
         }
     }
     
-    void WinGame()
+    public void CheckWinCondition(int currentScore)
     {
-        Debug.Log("You Win!");
+        // This method kept for compatibility but not used for coin-based win
+        // You can remove this if you want
+    }
+    
+    public void WinGame()
+    {
+        if (gameEnded) return;
+        
+        gameEnded = true;
+        Debug.Log("YOU WIN! All coins collected!");
         
         // Show win UI
         if (UIManager.instance != null)
@@ -56,13 +75,16 @@ public class GameManager : MonoBehaviour
             UIManager.instance.ShowWinMessage();
         }
         
-        // Disable player controls
-        DisablePlayerControls();
+        // Pause game
+        Time.timeScale = 0f;
     }
     
     public void LoseGame()
     {
-        Debug.Log("Game Over!");
+        if (gameEnded) return;
+        
+        gameEnded = true;
+        Debug.Log("GAME OVER - YOU LOSE!");
         
         // Show game over UI
         if (UIManager.instance != null)
@@ -70,16 +92,30 @@ public class GameManager : MonoBehaviour
             UIManager.instance.ShowGameOverMessage();
         }
         
-        // Disable player controls
-        DisablePlayerControls();
+        // Pause game
+        Time.timeScale = 0f;
     }
     
-    void DisablePlayerControls()
+    public void RestartGame()
     {
-        PlayerPhysics playerPhysics = FindFirstObjectByType<PlayerPhysics>();
-        if (playerPhysics != null)
-        {
-            playerPhysics.enabled = false;
-        }
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+    }
+    
+    public void QuitGame()
+    {
+        Debug.Log("Quitting game...");
+        Application.Quit();
+    }
+    
+    // Helper methods
+    public int GetCoinsCollected()
+    {
+        return coinsCollected;
+    }
+    
+    public int GetTotalCoins()
+    {
+        return totalCoinsInLevel;
     }
 }

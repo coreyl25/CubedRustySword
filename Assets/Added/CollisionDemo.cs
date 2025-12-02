@@ -32,7 +32,7 @@ public class CollisionDemo : MonoBehaviour
         {
             Debug.Log("You found the treasure!");
         }
-        else if (collision.gameObject.name == "Coin" || collision.gameObject.tag == "Coin")
+        else if (collision.gameObject.name.Contains("Coin"))
         {
             Debug.Log("You collected a coin!");
             
@@ -42,10 +42,16 @@ public class CollisionDemo : MonoBehaviour
                 ScoreManager.instance.AddScore(coinValue);
             }
             
+            // Notify GameManager that a coin was collected
+            if (GameManager.instance != null)
+            {
+                GameManager.instance.CoinCollected();
+            }
+            
             // Destroy the coin
             Destroy(collision.gameObject);
         }
-        else if (collision.gameObject.name == "Hazard" || collision.gameObject.tag == "Hazard")
+        else if (collision.gameObject.name == "Hazard" || collision.gameObject.name.Contains("Hazard"))
         {
             // Generic hazard - causes damage
             Debug.Log("Hit a hazard!");
