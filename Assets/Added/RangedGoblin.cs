@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class MeleeGoblin : MonoBehaviour
+public class RangedGoblin : MonoBehaviour
 {
     [Header("Patrol Settings")]
     public Vector3 pointA;
@@ -8,21 +8,23 @@ public class MeleeGoblin : MonoBehaviour
     public float patrolSpeed = 2f;
     
     [Header("Chase Settings")]
-    public float chaseSpeed = 4f;
-    public float chaseRange = 5f;
+    public float chaseSpeed = 3.5f;
+    public float chaseRange = 8f; // Longer range for ranged enemy
     
     [Header("Attack Settings")]
-    public float attackRange = 1.5f;
+    public float attackRange = 6f; // Stop at this distance to shoot
+    public GameObject projectilePrefab; // Optional - will be created if not assigned
+    public float projectileSpeed = 10f;
+    public float attackCooldown = 2f;
     public int damage = 1;
-    public float knockbackForce = 10f;
-    public float attackCooldown = 1f;
+    public float knockbackForce = 15f;
     
     [Header("Colors")]
-    public Color patrolColor = Color.green;
-    public Color chaseColor = Color.red;
+    public Color patrolColor = Color.white;
+    public Color chaseColor = new Color(1f, 0.5f, 0f); // Orange
     
     [Header("Score")]
-    public int scoreValue = 10;
+    public int scoreValue = 15;
     
     [Header("Player Reference (Optional - Auto-detected)")]
     public GameObject playerObject; // Optional - will auto-find if not assigned
@@ -38,6 +40,7 @@ public class MeleeGoblin : MonoBehaviour
     private float attackTimer = 0f;
     private Vector3 startPosition;
     private PlayerHealth playerHealth;
+    private Material projectileMaterial;
     
     void Start()
     {
@@ -66,7 +69,7 @@ public class MeleeGoblin : MonoBehaviour
                 Debug.LogWarning("PlayerHealth component not found on player!");
             }
             
-            Debug.Log("MeleeGoblin found player: " + playerObject.name);
+            Debug.Log("RangedGoblin found player: " + playerObject.name);
         }
         else
         {
@@ -84,6 +87,15 @@ public class MeleeGoblin : MonoBehaviour
         {
             rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
+        
+        // Create projectile prefab if not assigned
+        if (projectilePrefab == null)
+        {
+            CreateProjectilePrefab();
+        }
+        
+        // Create material for projectiles
+        CreateProjectileMaterial();
     }
     
     GameObject FindPlayerObject()
@@ -113,6 +125,39 @@ public class MeleeGoblin : MonoBehaviour
         if (player != null && player.GetComponent<PlayerHealth>() != null) return player;
         
         return null;
+    }
+    
+    void CreateProjectilePrefab()
+    {
+        Debug.Log("Creating projectile prefab programmatically...");
+        
+        // Create a sphere GameObject
+        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        projectile.name = "Projectile";
+        projectile.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+        
+        // Add Rigidbody
+        Rigidbody projRb = projectile.AddComponent<Rigidbody>();
+        projRb.useGravity = false;
+        projRb.isKinematic = true;
+        
+        // Add Projectile script
+        projectile.AddComponent<Projectile>();
+        
+        // Store as prefab reference
+        projectilePrefab = projectile;
+        
+        // Deactivate it (we'll instantiate copies)
+        projectile.SetActive(false);
+        
+        Debug.Log("Projectile prefab created successfully!");
+    }
+    
+    void CreateProjectileMaterial()
+    {
+        // Create a red material for projectiles
+        projectileMaterial = new Material(Shader.Find("Standard"));
+        projectileMaterial.color = Color.red;
     }
     
     void Update()
@@ -156,7 +201,7 @@ public class MeleeGoblin : MonoBehaviour
                     break;
                 }
                 
-                ChasePlayer();
+                ChasePlayer(distanceToPlayer);
                 
                 // Check if player is in attack range
                 if (distanceToPlayer <= attackRange && canAttack)
@@ -192,21 +237,35 @@ public class MeleeGoblin : MonoBehaviour
         }
     }
     
-    void ChasePlayer()
+    void ChasePlayer(float distanceToPlayer)
     {
-        // Move toward player
-        Vector3 direction = (player.position - transform.position).normalized;
-        transform.position = Vector3.MoveTowards(
-            transform.position, 
-            player.position, 
-            chaseSpeed * Time.deltaTime
-        );
-        
-        // Face the player
-        if (direction != Vector3.zero)
+        // Only move closer if outside attack range
+        if (distanceToPlayer > attackRange)
         {
-            Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            // Move toward player
+            Vector3 direction = (player.position - transform.position).normalized;
+            transform.position = Vector3.MoveTowards(
+                transform.position, 
+                player.position, 
+                chaseSpeed * Time.deltaTime
+            );
+            
+            // Face the player
+            if (direction != Vector3.zero)
+            {
+                Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            }
+        }
+        else
+        {
+            // Within attack range, just face the player
+            Vector3 direction = (player.position - transform.position).normalized;
+            if (direction != Vector3.zero)
+            {
+                Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+                transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            }
         }
     }
     
@@ -219,35 +278,50 @@ public class MeleeGoblin : MonoBehaviour
             return;
         }
         
-        // Try to damage player
-        if (playerHealth != null)
+        // Face the player before shooting
+        Vector3 direction = (player.position - transform.position).normalized;
+        if (direction != Vector3.zero)
         {
-            playerHealth.TakeDamage();
+            Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+            transform.rotation = lookRotation;
+        }
+        
+        // Spawn and fire projectile
+        if (projectilePrefab != null)
+        {
+            // Spawn projectile slightly in front of goblin
+            Vector3 spawnPosition = transform.position + transform.forward * 1f + Vector3.up * 0.5f;
+            GameObject projectile = Instantiate(projectilePrefab, spawnPosition, Quaternion.identity);
+            projectile.SetActive(true);
             
-            // Knockback player - apply stronger force
-            Vector3 knockbackDirection = (player.position - transform.position).normalized;
-            
-            // Make sure knockback goes slightly upward too
-            knockbackDirection.y = 0.3f;
-            knockbackDirection.Normalize();
-            
-            Rigidbody playerRb = player.GetComponent<Rigidbody>();
-            if (playerRb != null)
+            // Apply material
+            Renderer projRend = projectile.GetComponent<Renderer>();
+            if (projRend != null && projectileMaterial != null)
             {
-                // Reset velocity first to ensure consistent knockback
-                playerRb.linearVelocity = Vector3.zero;
-                playerRb.AddForce(knockbackDirection * knockbackForce, ForceMode.Impulse);
+                projRend.material = projectileMaterial;
             }
             
-            Debug.Log("Goblin attacked player! Knockback applied.");
+            // Get the Projectile component and initialize it
+            Projectile projectileScript = projectile.GetComponent<Projectile>();
+            if (projectileScript != null)
+            {
+                Vector3 shootDirection = (player.position - transform.position).normalized;
+                projectileScript.Initialize(shootDirection, projectileSpeed, damage, knockbackForce, chaseRange, playerObject);
+            }
+            else
+            {
+                Debug.LogError("Projectile prefab is missing Projectile script!");
+            }
+            
+            Debug.Log("Ranged Goblin fired projectile!");
         }
         
         // Set attack cooldown
         canAttack = false;
         attackTimer = 0f;
         
-        // Return to patrol state immediately
-        ChangeState(GoblinState.Patrol);
+        // Return to chase state
+        ChangeState(GoblinState.Chase);
     }
     
     void ChangeState(GoblinState newState)
@@ -290,7 +364,7 @@ public class MeleeGoblin : MonoBehaviour
     
     void Die()
     {
-        Debug.Log("Goblin defeated!");
+        Debug.Log("Ranged Goblin defeated!");
         
         // Add score
         if (ScoreManager.instance != null)

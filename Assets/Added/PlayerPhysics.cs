@@ -15,6 +15,14 @@ public class PlayerPhysics : MonoBehaviour
     private Vector3 originalPosition;
     private Rigidbody rb;
     
+    // NEW: Add jump buffer to prevent immediate re-grounding
+    private float coyoteTime = 0.1f; // Time after leaving ground where you can still jump
+    private float coyoteTimeCounter = 0f;
+    private float jumpBufferTime = 0.2f; // Time window to buffer jump input
+    private float jumpBufferCounter = 0f;
+    private float lastJumpTime = 0f; // Track when we last jumped
+    private float groundingDelay = 0.15f; // Delay before we can be grounded again after jumping
+    
     void Start()
     {
         originalPosition = transform.position;
@@ -41,6 +49,26 @@ public class PlayerPhysics : MonoBehaviour
         HandleMovement();
         HandleRotation();
         HandleJump();
+        
+        // Update coyote time
+        if (isGrounded)
+        {
+            coyoteTimeCounter = coyoteTime;
+        }
+        else
+        {
+            coyoteTimeCounter -= Time.deltaTime;
+        }
+        
+        // Update jump buffer
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            jumpBufferCounter = jumpBufferTime;
+        }
+        else
+        {
+            jumpBufferCounter -= Time.deltaTime;
+        }
     }
     
     void FixedUpdate()
@@ -104,12 +132,14 @@ public class PlayerPhysics : MonoBehaviour
         {
             Debug.Log($"Space pressed - isGrounded: {isGrounded}, jumpCount: {jumpCount}, hasDoubleJump: {hasDoubleJump}");
             
-            // First jump - when grounded
-            if (isGrounded && jumpCount == 0)
+            // First jump - when grounded OR within coyote time
+            if ((isGrounded || coyoteTimeCounter > 0f) && jumpCount == 0)
             {
                 PerformJump(jumpForce);
                 jumpCount = 1;
                 isGrounded = false; // Force isGrounded to false after jumping
+                coyoteTimeCounter = 0f; // Reset coyote time
+                lastJumpTime = Time.time; // Record jump time
                 Debug.Log("First jump!");
             }
             // Double jump - when in air and haven't used double jump yet
@@ -118,6 +148,7 @@ public class PlayerPhysics : MonoBehaviour
                 PerformJump(doubleJumpForce);
                 jumpCount = 2;
                 hasDoubleJump = false;
+                lastJumpTime = Time.time; // Record jump time
                 Debug.Log("Double jump!");
             }
             else
@@ -141,6 +172,13 @@ public class PlayerPhysics : MonoBehaviour
     
     void OnCollisionEnter(Collision collision)
     {
+        // Only process grounding if enough time has passed since last jump
+        if (Time.time - lastJumpTime < groundingDelay)
+        {
+            Debug.Log("Too soon after jump to be grounded");
+            return;
+        }
+        
         // Check if we're landing on something below us
         foreach (ContactPoint contact in collision.contacts)
         {
@@ -158,6 +196,12 @@ public class PlayerPhysics : MonoBehaviour
     
     void OnCollisionStay(Collision collision)
     {
+        // Only process grounding if enough time has passed since last jump
+        if (Time.time - lastJumpTime < groundingDelay)
+        {
+            return;
+        }
+        
         // Continuously check if grounded while in contact
         bool wasGrounded = isGrounded;
         
@@ -190,6 +234,13 @@ public class PlayerPhysics : MonoBehaviour
     
     void CheckGroundedStatus()
     {
+        // Only check if enough time has passed since last jump
+        if (Time.time - lastJumpTime < groundingDelay)
+        {
+            isGrounded = false;
+            return;
+        }
+        
         // Cast a small ray downward to check if still grounded
         RaycastHit hit;
         float rayDistance = 0.1f;

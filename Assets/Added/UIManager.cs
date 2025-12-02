@@ -12,6 +12,7 @@ public class UIManager : MonoBehaviour
     [Header("Panels")]
     public GameObject winPanel;
     public GameObject gameOverPanel;
+    public GameObject pauseMenuPanel; // NEW: Reference to pause menu panel
     
     void Awake()
     {
@@ -28,7 +29,7 @@ public class UIManager : MonoBehaviour
     
     void Start()
     {
-        // Make sure panels are hidden at start
+        // Make sure all panels are hidden at start
         if (winPanel != null)
         {
             winPanel.SetActive(false);
@@ -37,6 +38,14 @@ public class UIManager : MonoBehaviour
         {
             gameOverPanel.SetActive(false);
         }
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(false);
+            Debug.Log("Pause menu panel hidden at start");
+        }
+        
+        // Ensure game is not paused
+        Time.timeScale = 1f;
     }
     
     public void UpdateLives(int lives)
@@ -63,11 +72,34 @@ public class UIManager : MonoBehaviour
         }
     }
     
+    // NEW: Pause menu helper methods
+    public void ShowPauseMenu()
+    {
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(true);
+        }
+    }
+    
+    public void HidePauseMenu()
+    {
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(false);
+        }
+    }
+    
     // Button functions
     public void RestartGame()
     {
         // Unpause game first (in case it was paused)
         Time.timeScale = 1f;
+        
+        // Make sure pause state is reset
+        if (PauseMenu.instance != null)
+        {
+            PauseMenu.GameIsPaused = false;
+        }
         
         // Reload the current scene
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
@@ -77,6 +109,12 @@ public class UIManager : MonoBehaviour
     {
         // Unpause game first
         Time.timeScale = 1f;
+        
+        // Make sure pause state is reset
+        if (PauseMenu.instance != null)
+        {
+            PauseMenu.GameIsPaused = false;
+        }
         
         // Load the main menu scene
         SceneManager.LoadScene("MainMenu");
