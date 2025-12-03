@@ -87,6 +87,7 @@ Our instructors and peers for feedback and support
 Contact Information
 
 Seth Mack(Level Design & Dialogue Systems) - sethamack89@gmail.com | seth.mack@morehouse.edu
+
 Corey Lewis(Enemy AI & Combat Programming) - coreylewis382@gmail.com | corey.lewis1@morehouse.edu
 
 Made with ❤️ for young adventurers, enjoy the journey!
