@@ -17,6 +17,10 @@ public class MeleeGoblin : MonoBehaviour
     public float knockbackForce = 10f;
     public float attackCooldown = 1f;
     
+    [Header("Jump Kill Settings")]
+    public float jumpKillThreshold = 0.3f; // How much player must be above goblin (Y position difference)
+    public float jumpKillVelocityThreshold = -1f; // Player must be falling (negative Y velocity)
+    
     [Header("Colors")]
     public Color patrolColor = Color.green;
     public Color chaseColor = Color.red;
@@ -31,7 +35,7 @@ public class MeleeGoblin : MonoBehaviour
     public float chaseVolume = 0.5f;
     
     [Header("Player Reference (Optional - Auto-detected)")]
-    public GameObject playerObject; // Optional - will auto-find if not assigned
+    public GameObject playerObject;
     
     private enum GoblinState { Patrol, Chase, Attack }
     private GoblinState currentState = GoblinState.Patrol;
@@ -48,25 +52,24 @@ public class MeleeGoblin : MonoBehaviour
     // Audio sources
     private AudioSource alertAudioSource;
     private AudioSource chaseAudioSource;
-    private bool hasPlayedAlert = false; // Track if alert has been played this chase sequence
+    private bool hasPlayedAlert = false;
+    
+    // Jump kill tracking
+    private bool isDead = false;
     
     void Start()
     {
-        // Initialize patrol target
         startPosition = transform.position;
         patrolTarget = pointB;
         
-        // Get components
         rend = GetComponent<Renderer>();
         rb = GetComponent<Rigidbody>();
         
-        // Auto-find player if not assigned
         if (playerObject == null)
         {
             playerObject = FindPlayerObject();
         }
         
-        // Get player reference
         if (playerObject != null)
         {
             player = playerObject.transform;
@@ -76,74 +79,86 @@ public class MeleeGoblin : MonoBehaviour
             {
                 Debug.LogWarning("PlayerHealth component not found on player!");
             }
-            
-            Debug.Log("MeleeGoblin found player: " + playerObject.name);
         }
         else
         {
-            Debug.LogError("Could not find player object! Make sure player has PlayerHealth component.");
+            Debug.LogError("Could not find player object!");
         }
         
-        // Set initial color
         if (rend != null)
         {
             rend.material.color = patrolColor;
         }
         
-        // Configure Rigidbody if present
         if (rb != null)
         {
             rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
         
-        // Initialize audio sources
         InitializeAudioSources();
+        DiagnoseAudio();
     }
     
     void InitializeAudioSources()
     {
-        // Create audio source for alert sound (one-shot)
         alertAudioSource = gameObject.AddComponent<AudioSource>();
         alertAudioSource.playOnAwake = false;
         alertAudioSource.volume = alertVolume;
-        alertAudioSource.spatialBlend = 1f; // 3D sound
+        alertAudioSource.spatialBlend = 1f;
         alertAudioSource.minDistance = 5f;
         alertAudioSource.maxDistance = 20f;
         
-        // Create audio source for chase sound (looping)
         chaseAudioSource = gameObject.AddComponent<AudioSource>();
         chaseAudioSource.playOnAwake = false;
         chaseAudioSource.loop = true;
         chaseAudioSource.volume = chaseVolume;
-        chaseAudioSource.spatialBlend = 1f; // 3D sound
+        chaseAudioSource.spatialBlend = 1f;
         chaseAudioSource.minDistance = 5f;
         chaseAudioSource.maxDistance = 20f;
         
-        if (chaseSFX != null)
+        Debug.Log("[MeleeGoblin] Audio sources initialized on " + gameObject.name);
+    }
+    
+    void DiagnoseAudio()
+    {
+        Debug.Log("=== MELEE GOBLIN AUDIO DIAGNOSTIC (" + gameObject.name + ") ===");
+        
+        if (alertSFX != null)
         {
-            chaseAudioSource.clip = chaseSFX;
+            Debug.Log("[✓] Alert SFX assigned: " + alertSFX.name);
+        }
+        else
+        {
+            Debug.LogWarning("[✗] Alert SFX NOT ASSIGNED - Please assign AlertSFX.wav in Inspector!");
         }
         
-        Debug.Log("MeleeGoblin audio sources initialized");
+        if (chaseSFX != null)
+        {
+            Debug.Log("[✓] Chase SFX assigned: " + chaseSFX.name);
+            chaseAudioSource.clip = chaseSFX;
+        }
+        else
+        {
+            Debug.LogWarning("[✗] Chase SFX NOT ASSIGNED - Please assign ChaseSFX1.wav in Inspector!");
+        }
+        
+        Debug.Log("=================================================");
     }
     
     GameObject FindPlayerObject()
     {
-        // Method 1: Find by PlayerHealth component
         PlayerHealth[] allPlayerHealths = FindObjectsOfType<PlayerHealth>();
         if (allPlayerHealths.Length > 0)
         {
             return allPlayerHealths[0].gameObject;
         }
         
-        // Method 2: Find by PlayerPhysics component
         PlayerPhysics playerPhysics = FindObjectOfType<PlayerPhysics>();
         if (playerPhysics != null)
         {
             return playerPhysics.gameObject;
         }
         
-        // Method 3: Find by name (common player names)
         GameObject player = GameObject.Find("Player");
         if (player != null) return player;
         
@@ -158,9 +173,8 @@ public class MeleeGoblin : MonoBehaviour
     
     void Update()
     {
-        if (player == null) return;
+        if (player == null || isDead) return;
         
-        // Update attack cooldown
         if (!canAttack)
         {
             attackTimer += Time.deltaTime;
@@ -172,17 +186,13 @@ public class MeleeGoblin : MonoBehaviour
         }
         
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
-        
-        // Check if player is invincible - if so, ignore them
         bool playerIsInvincible = (playerHealth != null && playerHealth.IsInvincible());
         
-        // State machine
         switch (currentState)
         {
             case GoblinState.Patrol:
                 Patrol();
                 
-                // Only chase if player is NOT invincible and is in range
                 if (!playerIsInvincible && distanceToPlayer <= chaseRange)
                 {
                     ChangeState(GoblinState.Chase);
@@ -190,7 +200,6 @@ public class MeleeGoblin : MonoBehaviour
                 break;
                 
             case GoblinState.Chase:
-                // If player becomes invincible, return to patrol
                 if (playerIsInvincible)
                 {
                     ChangeState(GoblinState.Patrol);
@@ -199,12 +208,10 @@ public class MeleeGoblin : MonoBehaviour
                 
                 ChasePlayer();
                 
-                // Check if player is in attack range
                 if (distanceToPlayer <= attackRange && canAttack)
                 {
                     ChangeState(GoblinState.Attack);
                 }
-                // Check if player escaped chase range
                 else if (distanceToPlayer > chaseRange)
                 {
                     ChangeState(GoblinState.Patrol);
@@ -219,14 +226,12 @@ public class MeleeGoblin : MonoBehaviour
     
     void Patrol()
     {
-        // Move toward patrol target
         transform.position = Vector3.MoveTowards(
             transform.position, 
             patrolTarget, 
             patrolSpeed * Time.deltaTime
         );
         
-        // Switch patrol target when reached
         if (Vector3.Distance(transform.position, patrolTarget) < 0.1f)
         {
             patrolTarget = (patrolTarget == pointA) ? pointB : pointA;
@@ -235,7 +240,6 @@ public class MeleeGoblin : MonoBehaviour
     
     void ChasePlayer()
     {
-        // Move toward player
         Vector3 direction = (player.position - transform.position).normalized;
         transform.position = Vector3.MoveTowards(
             transform.position, 
@@ -243,7 +247,6 @@ public class MeleeGoblin : MonoBehaviour
             chaseSpeed * Time.deltaTime
         );
         
-        // Face the player
         if (direction != Vector3.zero)
         {
             Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
@@ -253,51 +256,39 @@ public class MeleeGoblin : MonoBehaviour
     
     void AttackPlayer()
     {
-        // Don't attack if player is invincible
         if (playerHealth != null && playerHealth.IsInvincible())
         {
             ChangeState(GoblinState.Patrol);
             return;
         }
         
-        // Try to damage player
         if (playerHealth != null)
         {
             playerHealth.TakeDamage();
             
-            // Knockback player - apply stronger force
             Vector3 knockbackDirection = (player.position - transform.position).normalized;
-            
-            // Make sure knockback goes slightly upward too
             knockbackDirection.y = 0.3f;
             knockbackDirection.Normalize();
             
             Rigidbody playerRb = player.GetComponent<Rigidbody>();
             if (playerRb != null)
             {
-                // Reset velocity first to ensure consistent knockback
                 playerRb.linearVelocity = Vector3.zero;
                 playerRb.AddForce(knockbackDirection * knockbackForce, ForceMode.Impulse);
             }
-            
-            Debug.Log("Goblin attacked player! Knockback applied.");
         }
         
-        // Set attack cooldown
         canAttack = false;
         attackTimer = 0f;
         
-        // Return to patrol state immediately
         ChangeState(GoblinState.Patrol);
     }
     
     void ChangeState(GoblinState newState)
     {
-        // Store old state for comparison
         GoblinState oldState = currentState;
         currentState = newState;
         
-        // Update color based on state
         if (rend != null)
         {
             switch (currentState)
@@ -312,112 +303,155 @@ public class MeleeGoblin : MonoBehaviour
             }
         }
         
-        // Handle audio based on state changes
         HandleStateAudio(oldState, newState);
     }
     
     void HandleStateAudio(GoblinState oldState, GoblinState newState)
     {
-        // Entering chase state from patrol
         if (oldState == GoblinState.Patrol && newState == GoblinState.Chase)
         {
-            // Play alert sound once
             if (!hasPlayedAlert && alertSFX != null && alertAudioSource != null)
             {
                 alertAudioSource.PlayOneShot(alertSFX);
                 hasPlayedAlert = true;
-                Debug.Log("MeleeGoblin played alert sound!");
+                Debug.Log("[MeleeGoblin] Played alert sound on " + gameObject.name);
+            }
+            else if (alertSFX == null)
+            {
+                Debug.LogWarning("[MeleeGoblin] Cannot play alert - AlertSFX.wav not assigned to " + gameObject.name);
             }
             
-            // Start looping chase sound
             if (chaseSFX != null && chaseAudioSource != null && !chaseAudioSource.isPlaying)
             {
+                if (chaseAudioSource.clip == null)
+                {
+                    chaseAudioSource.clip = chaseSFX;
+                }
                 chaseAudioSource.Play();
-                Debug.Log("MeleeGoblin started chase sound loop");
+                Debug.Log("[MeleeGoblin] Started chase sound on " + gameObject.name);
+            }
+            else if (chaseSFX == null)
+            {
+                Debug.LogWarning("[MeleeGoblin] Cannot play chase - ChaseSFX1.wav not assigned to " + gameObject.name);
             }
         }
         
-        // Returning to patrol from chase/attack
         if (newState == GoblinState.Patrol && (oldState == GoblinState.Chase || oldState == GoblinState.Attack))
         {
-            // Stop chase sound
             if (chaseAudioSource != null && chaseAudioSource.isPlaying)
             {
                 chaseAudioSource.Stop();
-                Debug.Log("MeleeGoblin stopped chase sound");
+                Debug.Log("[MeleeGoblin] Stopped chase sound on " + gameObject.name);
             }
             
-            // Reset alert flag so it can play again next chase
             hasPlayedAlert = false;
-        }
-        
-        // Continue chase sound during attack state
-        if (newState == GoblinState.Attack && oldState == GoblinState.Chase)
-        {
-            // Keep chase sound playing during attack
-            // Don't stop it
         }
     }
     
     void OnCollisionEnter(Collision collision)
     {
-        // Check if it's the player by checking for PlayerHealth component
+        if (isDead) return;
+        
+        // Check if it's the player
         PlayerHealth hitPlayerHealth = collision.gameObject.GetComponent<PlayerHealth>();
         
         if (hitPlayerHealth != null)
         {
-            // Check if collision is from above (player jumped on head)
-            Vector3 hitDirection = collision.contacts[0].normal;
+            // Get player rigidbody to check velocity
+            Rigidbody playerRb = collision.gameObject.GetComponent<Rigidbody>();
             
-            // If the hit normal points downward, player hit from above
-            if (hitDirection.y < -0.5f)
+            // Calculate relative positions
+            float playerY = collision.transform.position.y;
+            float goblinY = transform.position.y;
+            float yDifference = playerY - goblinY;
+            
+            // Check if player is falling (negative Y velocity)
+            bool playerIsFalling = false;
+            if (playerRb != null)
             {
+                playerIsFalling = playerRb.linearVelocity.y < jumpKillVelocityThreshold;
+            }
+            
+            // Check collision from above using contact points
+            bool hitFromAbove = false;
+            foreach (ContactPoint contact in collision.contacts)
+            {
+                // If contact normal points downward (from goblin's perspective), player hit from above
+                if (contact.normal.y < -0.5f)
+                {
+                    hitFromAbove = true;
+                    break;
+                }
+            }
+            
+            // Debug information
+            Debug.Log($"[MeleeGoblin] Collision - Y Diff: {yDifference:F2}, Player Falling: {playerIsFalling}, Hit From Above: {hitFromAbove}");
+            
+            // Player successfully jumped on goblin's head
+            if (hitFromAbove && playerIsFalling && yDifference > jumpKillThreshold)
+            {
+                Debug.Log("[MeleeGoblin] Player jumped on head - Goblin defeated!");
+                
+                // Bounce player upward slightly
+                if (playerRb != null)
+                {
+                    Vector3 bounceVelocity = playerRb.linearVelocity;
+                    bounceVelocity.y = 5f; // Small bounce
+                    playerRb.linearVelocity = bounceVelocity;
+                }
+                
                 Die();
+            }
+            else
+            {
+                // Player hit goblin from side or while not falling - goblin can damage player
+                Debug.Log("[MeleeGoblin] Player hit from side/front - No jump kill");
+                // Normal collision - let the attack system handle it
             }
         }
     }
     
     void Die()
     {
-        Debug.Log("Goblin defeated!");
+        if (isDead) return;
         
-        // Stop all sounds
+        isDead = true;
+        Debug.Log("[MeleeGoblin] Goblin defeated!");
+        
         if (chaseAudioSource != null && chaseAudioSource.isPlaying)
         {
             chaseAudioSource.Stop();
         }
         
-        // Add score
         if (ScoreManager.instance != null)
         {
             ScoreManager.instance.AddScore(scoreValue);
         }
         
-        // Destroy goblin
         Destroy(gameObject);
     }
     
-    // Visualize detection ranges in editor
     void OnDrawGizmosSelected()
     {
-        // Draw patrol points
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(pointA, 0.3f);
         Gizmos.DrawWireSphere(pointB, 0.3f);
         Gizmos.DrawLine(pointA, pointB);
         
-        // Draw chase range
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
         
-        // Draw attack range
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+        
+        // Visualize jump kill zone (above the goblin)
+        Gizmos.color = Color.cyan;
+        Vector3 killZoneCenter = transform.position + Vector3.up * (jumpKillThreshold + 0.5f);
+        Gizmos.DrawWireCube(killZoneCenter, new Vector3(1f, 0.2f, 1f));
     }
     
     void OnDestroy()
     {
-        // Clean up audio when destroyed
         if (chaseAudioSource != null && chaseAudioSource.isPlaying)
         {
             chaseAudioSource.Stop();
