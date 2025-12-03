@@ -1,4 +1,5 @@
 Rusty Sword Cubed Edition
+
 Overview
 Rusty Sword Cubed Edition is a 3D action-adventure RPG that acts as a direct sequel to the OG Rusty Sword. Following his swift defeat at the hands of Russell months prior, Malor decides if he can’t steal the amulet from Princess Aliana he’ll make one himself. However Malor’s attempt at dark magic backfires horribly, instead of granting him power to rule the world, the world was instead transformed into an amalgamation of low resolution polygons. Russell must now set out yet again across the forest, mountains, and demon castle to defeat Malor, destroy his amulet, and return the world back to normal.
 
@@ -11,6 +12,7 @@ Team: Corey Lewis & Seth Mack
 Playtime: Approximately 20-30 minutes
 
 Features
+
 Core Gameplay
 
 Easy-To-Grasp Combat System: Jump onto enemies heads to defeat them.
@@ -25,8 +27,11 @@ Three Unique Regions: Forest, Deeper Forest, and Arena Castle
 Boss Battles: Challenging encounters that test your mastery of platforming mechanics
 
 Visual Style
+
 Inspired by the Fire Emblem franchise, featuring stylized 3D character models and environments that balance visual appeal with performance for our target age group.
+
 Game Structure
+
 Level Design
 Level 1: Forest Tutorial (The Awakening)
 Learn basic controls and combat mechanics
@@ -44,23 +49,27 @@ Utilize all learned skills in a final test
 Octagonal arena with strategic pillar placement
 
 Enemy Types
+
 Each region features unique enemy variants:
 Melee Enemies: Goblins with patrol patterns
 Ranged Enemies: Archer Skeletons on elevated positions
 Boss: Rantor the Goblin King with multi-phase combat
 
 Inspirations
+
 Our game draws inspiration from beloved franchises:
 The Legend of Zelda: Skyward Sword - Combat feel and puzzle integration
 Fire Emblem: Awakening - Visual style and character presentation
 Elden Ring - Exploration and world building
 
 Controls
+
 Movement: Directional arrowkeys
 Jump: Spacebar
 Camera Angle: V key
 
 Technical Project Details
+
 Built With Engine: Unity
 Camera System: Top-down/Third-person hybrid
 Level Size: Compact 30x35 meter arenas
@@ -69,12 +78,14 @@ Future Contributions
 This is a student project by Corey Lewis and Seth Mack. Currently we’re looking to add voice actors, artists, and more level designers. If interested please contact us, we appreciate your assistance!
 
 Acknowledgments
+
 Fire Emblem franchise for visual inspiration
 The Legend of Zelda series for gameplay concepts
 Our instructors and peers for feedback and support
 
 
 Contact Information
+
 Seth Mack(Level Design & Dialogue Systems) - sethamack89@gmail.com | seth.mack@morehouse.edu
 Corey Lewis(Enemy AI & Combat Programming) - coreylewis382@gmail.com | corey.lewis1@morehouse.edu
 
