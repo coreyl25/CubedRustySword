@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 465e69b25b97d463cbb989e3dd510748, type: 3}
+  m_Name: SigbertFirstDialouge
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueData
+  dialogueLines:
+  - speakerName: ???
+    dialogueText: Is that you Russell? Oh thank the great HEAVENS you're here!!!
+  - speakerName: Russell
+    dialogueText: Who are you and what's going on?
+  - speakerName: Sigbert
+    dialogueText: It's me Sigbert don't you recongize me? Malor's turned the whole
+      world into low resolution landscape trying to create his own amulet. You'll
+      have to travel through the forest, mountains, and demon castle yet again to
+      defeat him.
+  - speakerName: Russell
+    dialogueText: But how will defeating him turn everything back to normal?
+  - speakerName: Sigbert
+    dialogueText: You'll have to gather magical orbs on your way there so when you
+      arrive at his throne you'll have the power to break his amulet. Use the diretional
+      arrows to move, the spacebar to jump and double jump, and e to change the camera
+      angle.
+  - speakerName: Sigbert
+    dialogueText: I'd travel with you but I'm having trouble adjusting to this cursed
+      new body, good luck on your quest friend and godspeed!
+  canSkip: 1
+  pauseGame: 0
