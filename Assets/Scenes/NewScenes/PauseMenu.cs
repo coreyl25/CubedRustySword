@@ -70,7 +70,7 @@ public class PauseMenu : MonoBehaviour
         // Don't allow pausing if game has ended
         if (GameManager.instance != null)
         {
-            // You could add a check here if GameManager has a gameEnded flag
+            
         }
         
         // Check for Escape key press
