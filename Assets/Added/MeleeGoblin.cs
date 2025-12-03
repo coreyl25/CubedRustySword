@@ -24,6 +24,12 @@ public class MeleeGoblin : MonoBehaviour
     [Header("Score")]
     public int scoreValue = 10;
     
+    [Header("Sound Effects")]
+    public AudioClip alertSFX;
+    public AudioClip chaseSFX;
+    public float alertVolume = 0.7f;
+    public float chaseVolume = 0.5f;
+    
     [Header("Player Reference (Optional - Auto-detected)")]
     public GameObject playerObject; // Optional - will auto-find if not assigned
     
@@ -38,6 +44,11 @@ public class MeleeGoblin : MonoBehaviour
     private float attackTimer = 0f;
     private Vector3 startPosition;
     private PlayerHealth playerHealth;
+    
+    // Audio sources
+    private AudioSource alertAudioSource;
+    private AudioSource chaseAudioSource;
+    private bool hasPlayedAlert = false; // Track if alert has been played this chase sequence
     
     void Start()
     {
@@ -84,6 +95,36 @@ public class MeleeGoblin : MonoBehaviour
         {
             rb.constraints = RigidbodyConstraints.FreezeRotation;
         }
+        
+        // Initialize audio sources
+        InitializeAudioSources();
+    }
+    
+    void InitializeAudioSources()
+    {
+        // Create audio source for alert sound (one-shot)
+        alertAudioSource = gameObject.AddComponent<AudioSource>();
+        alertAudioSource.playOnAwake = false;
+        alertAudioSource.volume = alertVolume;
+        alertAudioSource.spatialBlend = 1f; // 3D sound
+        alertAudioSource.minDistance = 5f;
+        alertAudioSource.maxDistance = 20f;
+        
+        // Create audio source for chase sound (looping)
+        chaseAudioSource = gameObject.AddComponent<AudioSource>();
+        chaseAudioSource.playOnAwake = false;
+        chaseAudioSource.loop = true;
+        chaseAudioSource.volume = chaseVolume;
+        chaseAudioSource.spatialBlend = 1f; // 3D sound
+        chaseAudioSource.minDistance = 5f;
+        chaseAudioSource.maxDistance = 20f;
+        
+        if (chaseSFX != null)
+        {
+            chaseAudioSource.clip = chaseSFX;
+        }
+        
+        Debug.Log("MeleeGoblin audio sources initialized");
     }
     
     GameObject FindPlayerObject()
@@ -252,6 +293,8 @@ public class MeleeGoblin : MonoBehaviour
     
     void ChangeState(GoblinState newState)
     {
+        // Store old state for comparison
+        GoblinState oldState = currentState;
         currentState = newState;
         
         // Update color based on state
@@ -267,6 +310,52 @@ public class MeleeGoblin : MonoBehaviour
                     rend.material.color = chaseColor;
                     break;
             }
+        }
+        
+        // Handle audio based on state changes
+        HandleStateAudio(oldState, newState);
+    }
+    
+    void HandleStateAudio(GoblinState oldState, GoblinState newState)
+    {
+        // Entering chase state from patrol
+        if (oldState == GoblinState.Patrol && newState == GoblinState.Chase)
+        {
+            // Play alert sound once
+            if (!hasPlayedAlert && alertSFX != null && alertAudioSource != null)
+            {
+                alertAudioSource.PlayOneShot(alertSFX);
+                hasPlayedAlert = true;
+                Debug.Log("MeleeGoblin played alert sound!");
+            }
+            
+            // Start looping chase sound
+            if (chaseSFX != null && chaseAudioSource != null && !chaseAudioSource.isPlaying)
+            {
+                chaseAudioSource.Play();
+                Debug.Log("MeleeGoblin started chase sound loop");
+            }
+        }
+        
+        // Returning to patrol from chase/attack
+        if (newState == GoblinState.Patrol && (oldState == GoblinState.Chase || oldState == GoblinState.Attack))
+        {
+            // Stop chase sound
+            if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+            {
+                chaseAudioSource.Stop();
+                Debug.Log("MeleeGoblin stopped chase sound");
+            }
+            
+            // Reset alert flag so it can play again next chase
+            hasPlayedAlert = false;
+        }
+        
+        // Continue chase sound during attack state
+        if (newState == GoblinState.Attack && oldState == GoblinState.Chase)
+        {
+            // Keep chase sound playing during attack
+            // Don't stop it
         }
     }
     
@@ -291,6 +380,12 @@ public class MeleeGoblin : MonoBehaviour
     void Die()
     {
         Debug.Log("Goblin defeated!");
+        
+        // Stop all sounds
+        if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            chaseAudioSource.Stop();
+        }
         
         // Add score
         if (ScoreManager.instance != null)
@@ -318,5 +413,14 @@ public class MeleeGoblin : MonoBehaviour
         // Draw attack range
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up audio when destroyed
+        if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            chaseAudioSource.Stop();
+        }
     }
 }

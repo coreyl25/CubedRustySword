@@ -26,6 +26,14 @@ public class RangedGoblin : MonoBehaviour
     [Header("Score")]
     public int scoreValue = 15;
     
+    [Header("Sound Effects")]
+    public AudioClip alertSFX;
+    public AudioClip chaseSFX;
+    public AudioClip projectileSFX;
+    public float alertVolume = 0.7f;
+    public float chaseVolume = 0.5f;
+    public float projectileVolume = 0.6f;
+    
     [Header("Player Reference (Optional - Auto-detected)")]
     public GameObject playerObject; // Optional - will auto-find if not assigned
     
@@ -41,6 +49,12 @@ public class RangedGoblin : MonoBehaviour
     private Vector3 startPosition;
     private PlayerHealth playerHealth;
     private Material projectileMaterial;
+    
+    // Audio sources
+    private AudioSource alertAudioSource;
+    private AudioSource chaseAudioSource;
+    private AudioSource projectileAudioSource;
+    private bool hasPlayedAlert = false; // Track if alert has been played this chase sequence
     
     void Start()
     {
@@ -96,6 +110,44 @@ public class RangedGoblin : MonoBehaviour
         
         // Create material for projectiles
         CreateProjectileMaterial();
+        
+        // Initialize audio sources
+        InitializeAudioSources();
+    }
+    
+    void InitializeAudioSources()
+    {
+        // Create audio source for alert sound (one-shot)
+        alertAudioSource = gameObject.AddComponent<AudioSource>();
+        alertAudioSource.playOnAwake = false;
+        alertAudioSource.volume = alertVolume;
+        alertAudioSource.spatialBlend = 1f; // 3D sound
+        alertAudioSource.minDistance = 5f;
+        alertAudioSource.maxDistance = 20f;
+        
+        // Create audio source for chase sound (looping)
+        chaseAudioSource = gameObject.AddComponent<AudioSource>();
+        chaseAudioSource.playOnAwake = false;
+        chaseAudioSource.loop = true;
+        chaseAudioSource.volume = chaseVolume;
+        chaseAudioSource.spatialBlend = 1f; // 3D sound
+        chaseAudioSource.minDistance = 5f;
+        chaseAudioSource.maxDistance = 20f;
+        
+        if (chaseSFX != null)
+        {
+            chaseAudioSource.clip = chaseSFX;
+        }
+        
+        // Create audio source for projectile firing sound (one-shot)
+        projectileAudioSource = gameObject.AddComponent<AudioSource>();
+        projectileAudioSource.playOnAwake = false;
+        projectileAudioSource.volume = projectileVolume;
+        projectileAudioSource.spatialBlend = 1f; // 3D sound
+        projectileAudioSource.minDistance = 5f;
+        projectileAudioSource.maxDistance = 20f;
+        
+        Debug.Log("RangedGoblin audio sources initialized");
     }
     
     GameObject FindPlayerObject()
@@ -286,6 +338,9 @@ public class RangedGoblin : MonoBehaviour
             transform.rotation = lookRotation;
         }
         
+        // Play projectile firing sound
+        PlayProjectileSound();
+        
         // Spawn and fire projectile
         if (projectilePrefab != null)
         {
@@ -324,8 +379,19 @@ public class RangedGoblin : MonoBehaviour
         ChangeState(GoblinState.Chase);
     }
     
+    void PlayProjectileSound()
+    {
+        if (projectileSFX != null && projectileAudioSource != null)
+        {
+            projectileAudioSource.PlayOneShot(projectileSFX);
+            Debug.Log("RangedGoblin played projectile firing sound!");
+        }
+    }
+    
     void ChangeState(GoblinState newState)
     {
+        // Store old state for comparison
+        GoblinState oldState = currentState;
         currentState = newState;
         
         // Update color based on state
@@ -341,6 +407,52 @@ public class RangedGoblin : MonoBehaviour
                     rend.material.color = chaseColor;
                     break;
             }
+        }
+        
+        // Handle audio based on state changes
+        HandleStateAudio(oldState, newState);
+    }
+    
+    void HandleStateAudio(GoblinState oldState, GoblinState newState)
+    {
+        // Entering chase state from patrol
+        if (oldState == GoblinState.Patrol && newState == GoblinState.Chase)
+        {
+            // Play alert sound once
+            if (!hasPlayedAlert && alertSFX != null && alertAudioSource != null)
+            {
+                alertAudioSource.PlayOneShot(alertSFX);
+                hasPlayedAlert = true;
+                Debug.Log("RangedGoblin played alert sound!");
+            }
+            
+            // Start looping chase sound
+            if (chaseSFX != null && chaseAudioSource != null && !chaseAudioSource.isPlaying)
+            {
+                chaseAudioSource.Play();
+                Debug.Log("RangedGoblin started chase sound loop");
+            }
+        }
+        
+        // Returning to patrol from chase/attack
+        if (newState == GoblinState.Patrol && (oldState == GoblinState.Chase || oldState == GoblinState.Attack))
+        {
+            // Stop chase sound
+            if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+            {
+                chaseAudioSource.Stop();
+                Debug.Log("RangedGoblin stopped chase sound");
+            }
+            
+            // Reset alert flag so it can play again next chase
+            hasPlayedAlert = false;
+        }
+        
+        // Continue chase sound during attack state
+        if (newState == GoblinState.Attack && oldState == GoblinState.Chase)
+        {
+            // Keep chase sound playing during attack
+            // Don't stop it
         }
     }
     
@@ -365,6 +477,12 @@ public class RangedGoblin : MonoBehaviour
     void Die()
     {
         Debug.Log("Ranged Goblin defeated!");
+        
+        // Stop all sounds
+        if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            chaseAudioSource.Stop();
+        }
         
         // Add score
         if (ScoreManager.instance != null)
@@ -392,5 +510,14 @@ public class RangedGoblin : MonoBehaviour
         // Draw attack range
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up audio when destroyed
+        if (chaseAudioSource != null && chaseAudioSource.isPlaying)
+        {
+            chaseAudioSource.Stop();
+        }
     }
 }

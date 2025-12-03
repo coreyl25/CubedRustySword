@@ -1465,6 +1465,10 @@ MonoBehaviour:
   patrolColor: {r: 0, g: 1, b: 0, a: 1}
   chaseColor: {r: 1, g: 0, b: 0, a: 1}
   scoreValue: 10
+  alertSFX: {fileID: 8300000, guid: e508dba887c7f4e218c586a3e5c0b8e0, type: 3}
+  chaseSFX: {fileID: 8300000, guid: 16312d74f5df148aeb5036c5a85e253c, type: 3}
+  alertVolume: 0.7
+  chaseVolume: 0.5
   playerObject: {fileID: 1180400356}
 --- !u!65 &685341962
 BoxCollider:
@@ -3415,7 +3419,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6610c5d5e826b456788466f1335e31d4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DialoguePlayerController
-  playerPhysics: {fileID: 0}
+  playerPhysics: {fileID: 5228824883518631380}
   playerBehaviour: {fileID: 0}
   disableMovementDuringDialogue: 1
   disableJumpingDuringDialogue: 1
@@ -4735,6 +4739,12 @@ MonoBehaviour:
   patrolColor: {r: 1, g: 1, b: 1, a: 1}
   chaseColor: {r: 1, g: 0.5, b: 0, a: 1}
   scoreValue: 15
+  alertSFX: {fileID: 8300000, guid: e508dba887c7f4e218c586a3e5c0b8e0, type: 3}
+  chaseSFX: {fileID: 8300000, guid: 16312d74f5df148aeb5036c5a85e253c, type: 3}
+  projectileSFX: {fileID: 8300000, guid: 40127004342614836bfec62d54f4bb75, type: 3}
+  alertVolume: 0.7
+  chaseVolume: 0.5
+  projectileVolume: 0.6
   playerObject: {fileID: 0}
 --- !u!65 &2010690554
 BoxCollider:
@@ -5133,6 +5143,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 1083100363944308820, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
+      propertyPath: coinCollectSFX
+      value: 
+      objectReference: {fileID: 8300000, guid: 7516dcbc618bd4d828e078679a52b936, type: 3}
     - target: {fileID: 5033523765389848879, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
       propertyPath: m_LocalPosition.x
       value: -11.75
@@ -5173,6 +5187,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6111642248647239982, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
+      propertyPath: jumpSFX
+      value: 
+      objectReference: {fileID: 8300000, guid: f199a8f2b56bf4a6eabcf6eea814dd8f, type: 3}
+    - target: {fileID: 6111642248647239982, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
+      propertyPath: walkingSFX
+      value: 
+      objectReference: {fileID: 8300000, guid: e5dc51be5fa2a460b9b4692424ddc89e, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -5184,6 +5206,17 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1227017939}
   m_SourcePrefab: {fileID: 100100000, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
+--- !u!114 &5228824883518631380 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6111642248647239982, guid: 1b473f8c3ddb54136a58886d05a2eda3, type: 3}
+  m_PrefabInstance: {fileID: 5228824883518631379}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1180400356}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2452e3aff354e4cf09fe87a573e6accb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerPhysics
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

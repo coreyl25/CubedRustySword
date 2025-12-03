@@ -5,6 +5,12 @@ public class CollisionDemo : MonoBehaviour
     private PlayerHealth playerHealth;
     public int coinValue = 1; // Points per coin
     
+    [Header("Sound Effects")]
+    public AudioClip coinCollectSFX;
+    public float coinCollectVolume = 0.8f;
+    
+    private AudioSource audioSource;
+    
     void Start()
     {
         // Get reference to the PlayerHealth component
@@ -14,6 +20,20 @@ public class CollisionDemo : MonoBehaviour
         {
             Debug.LogError("PlayerHealth component not found on player!");
         }
+        
+        // Initialize audio source
+        InitializeAudioSource();
+    }
+    
+    void InitializeAudioSource()
+    {
+        // Create audio source for coin collection sound
+        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
+        audioSource.volume = coinCollectVolume;
+        audioSource.spatialBlend = 0f; // 2D sound
+        
+        Debug.Log("CollisionDemo audio source initialized");
     }
     
     void OnCollisionEnter(Collision collision)
@@ -35,6 +55,9 @@ public class CollisionDemo : MonoBehaviour
         else if (collision.gameObject.name.Contains("Coin"))
         {
             Debug.Log("You collected a coin!");
+            
+            // Play coin collection sound
+            PlayCoinCollectSound();
             
             // Add score
             if (ScoreManager.instance != null)
@@ -63,6 +86,19 @@ public class CollisionDemo : MonoBehaviour
         
         // Optional: Keep the original debug message for other objects
         Debug.Log("Player collided with: " + collision.gameObject.name);
+    }
+    
+    void PlayCoinCollectSound()
+    {
+        if (coinCollectSFX != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(coinCollectSFX);
+            Debug.Log("Playing coin collect sound");
+        }
+        else
+        {
+            Debug.LogWarning("Coin collect SFX not assigned or audio source missing!");
+        }
     }
     
     void Update()

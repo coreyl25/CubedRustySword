@@ -9,11 +9,23 @@ public class PlayerPhysics : MonoBehaviour
     public float airControlMultiplier = 0.75f; // Controls how much movement is allowed in air
     public float gravityMultiplier = 2f; // Adjust gravity strength (lower = floatier)
     
+    [Header("Sound Effects")]
+    public AudioClip jumpSFX;
+    public AudioClip walkingSFX;
+    [Range(1.0f, 2.0f)]
+    public float doubleJumpPitchMultiplier = 1.3f; // Higher pitch for double jump
+    public float walkingVolume = 0.5f;
+    public float jumpVolume = 0.7f;
+    
     private bool isGrounded = true;
     private bool hasDoubleJump = true; // Tracks if double jump is available
     private int jumpCount = 0; // Track number of jumps performed
     private Vector3 originalPosition;
     private Rigidbody rb;
+    
+    // Audio sources
+    private AudioSource jumpAudioSource;
+    private AudioSource walkingAudioSource;
     
     // NEW: Add jump buffer to prevent immediate re-grounding
     private float coyoteTime = 0.1f; // Time after leaving ground where you can still jump
@@ -22,6 +34,10 @@ public class PlayerPhysics : MonoBehaviour
     private float jumpBufferCounter = 0f;
     private float lastJumpTime = 0f; // Track when we last jumped
     private float groundingDelay = 0.15f; // Delay before we can be grounded again after jumping
+    
+    // Movement tracking
+    private bool isMoving = false;
+    private float movementThreshold = 0.1f; // Minimum input to be considered "moving"
     
     void Start()
     {
@@ -39,6 +55,32 @@ public class PlayerPhysics : MonoBehaviour
             rb.constraints = RigidbodyConstraints.FreezeRotation;
             rb.useGravity = true;
         }
+        
+        // Initialize audio sources
+        InitializeAudioSources();
+    }
+    
+    void InitializeAudioSources()
+    {
+        // Create audio source for jump sounds
+        jumpAudioSource = gameObject.AddComponent<AudioSource>();
+        jumpAudioSource.playOnAwake = false;
+        jumpAudioSource.volume = jumpVolume;
+        jumpAudioSource.spatialBlend = 0f; // 2D sound
+        
+        // Create audio source for walking sounds
+        walkingAudioSource = gameObject.AddComponent<AudioSource>();
+        walkingAudioSource.playOnAwake = false;
+        walkingAudioSource.loop = true;
+        walkingAudioSource.volume = walkingVolume;
+        walkingAudioSource.spatialBlend = 0f; // 2D sound
+        
+        if (walkingSFX != null)
+        {
+            walkingAudioSource.clip = walkingSFX;
+        }
+        
+        Debug.Log("Player audio sources initialized");
     }
     
     void Update()
@@ -49,6 +91,7 @@ public class PlayerPhysics : MonoBehaviour
         HandleMovement();
         HandleRotation();
         HandleJump();
+        HandleWalkingSound();
         
         // Update coyote time
         if (isGrounded)
@@ -85,6 +128,9 @@ public class PlayerPhysics : MonoBehaviour
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
         Vector3 direction = new Vector3(h, 0, v).normalized;
+        
+        // Check if player is actually moving
+        isMoving = (Mathf.Abs(h) > movementThreshold || Mathf.Abs(v) > movementThreshold) && isGrounded;
         
         // Apply air control - reduce movement speed when not grounded
         float currentSpeed = isGrounded ? speed : speed * airControlMultiplier;
@@ -135,7 +181,7 @@ public class PlayerPhysics : MonoBehaviour
             // First jump - when grounded OR within coyote time
             if ((isGrounded || coyoteTimeCounter > 0f) && jumpCount == 0)
             {
-                PerformJump(jumpForce);
+                PerformJump(jumpForce, false);
                 jumpCount = 1;
                 isGrounded = false; // Force isGrounded to false after jumping
                 coyoteTimeCounter = 0f; // Reset coyote time
@@ -145,7 +191,7 @@ public class PlayerPhysics : MonoBehaviour
             // Double jump - when in air and haven't used double jump yet
             else if (!isGrounded && jumpCount == 1 && hasDoubleJump)
             {
-                PerformJump(doubleJumpForce);
+                PerformJump(doubleJumpForce, true);
                 jumpCount = 2;
                 hasDoubleJump = false;
                 lastJumpTime = Time.time; // Record jump time
@@ -158,7 +204,7 @@ public class PlayerPhysics : MonoBehaviour
         }
     }
     
-    void PerformJump(float force)
+    void PerformJump(float force, bool isDoubleJump)
     {
         // Reset Y velocity before applying jump force for consistent jump height
         Vector3 velocity = rb.linearVelocity;
@@ -168,6 +214,53 @@ public class PlayerPhysics : MonoBehaviour
         // Apply upward force
         rb.AddForce(Vector3.up * force, ForceMode.Impulse);
         isGrounded = false;
+        
+        // Play jump sound effect
+        PlayJumpSound(isDoubleJump);
+    }
+    
+    void PlayJumpSound(bool isDoubleJump)
+    {
+        if (jumpSFX != null && jumpAudioSource != null)
+        {
+            jumpAudioSource.clip = jumpSFX;
+            
+            // Set pitch - higher for double jump
+            if (isDoubleJump)
+            {
+                jumpAudioSource.pitch = doubleJumpPitchMultiplier;
+                Debug.Log("Playing double jump sound (higher pitch)");
+            }
+            else
+            {
+                jumpAudioSource.pitch = 1.0f;
+                Debug.Log("Playing jump sound (normal pitch)");
+            }
+            
+            jumpAudioSource.Play();
+        }
+    }
+    
+    void HandleWalkingSound()
+    {
+        // Play walking sound only when moving on ground
+        if (isMoving && isGrounded)
+        {
+            if (!walkingAudioSource.isPlaying && walkingSFX != null)
+            {
+                walkingAudioSource.Play();
+                Debug.Log("Started walking sound");
+            }
+        }
+        else
+        {
+            // Stop walking sound when not moving or in air
+            if (walkingAudioSource.isPlaying)
+            {
+                walkingAudioSource.Stop();
+                Debug.Log("Stopped walking sound");
+            }
+        }
     }
     
     void OnCollisionEnter(Collision collision)
@@ -252,6 +345,15 @@ public class PlayerPhysics : MonoBehaviour
         else
         {
             isGrounded = false;
+        }
+    }
+    
+    void OnDisable()
+    {
+        // Stop all sounds when disabled
+        if (walkingAudioSource != null && walkingAudioSource.isPlaying)
+        {
+            walkingAudioSource.Stop();
         }
     }
 }
