@@ -28,7 +28,8 @@ MonoBehaviour:
     dialogueText: You'll have to gather magical orbs on your way there so when you
       arrive at his throne you'll have the power to break his amulet. Use the diretional
       arrows to move, the spacebar to jump and double jump, and e to change the camera
-      angle.
+      angle. To defeat any enemies you encounter along the way you must jump on top
+      of their heads.
   - speakerName: Sigbert
     dialogueText: I'd travel with you but I'm having trouble adjusting to this cursed
       new body, good luck on your quest friend and godspeed!

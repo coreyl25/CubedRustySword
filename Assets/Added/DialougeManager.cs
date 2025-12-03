@@ -27,6 +27,7 @@ public class DialogueManager : MonoBehaviour
     private bool isTyping = false;
     private bool dialogueActive = false;
     private Coroutine typingCoroutine;
+    private bool audioInitialized = false;
     
     void Awake()
     {
@@ -38,17 +39,15 @@ public class DialogueManager : MonoBehaviour
         else
         {
             Destroy(gameObject);
+            return;
         }
-        
-        // Create AudioSource for voice effects
-        voiceAudioSource = gameObject.AddComponent<AudioSource>();
-        voiceAudioSource.loop = true; // Voice plays continuously during dialogue
-        voiceAudioSource.volume = voiceVolume;
-        voiceAudioSource.playOnAwake = false;
     }
     
     void Start()
     {
+        // Initialize AudioSource in Start() instead of Awake() to avoid FMOD initialization conflicts
+        InitializeAudioSource();
+        
         // Hide dialogue panel at start
         if (dialoguePanel != null)
         {
@@ -59,6 +58,27 @@ public class DialogueManager : MonoBehaviour
         {
             continueIndicator.SetActive(false);
         }
+    }
+    
+    void InitializeAudioSource()
+    {
+        // Check if AudioSource already exists
+        voiceAudioSource = GetComponent<AudioSource>();
+        
+        if (voiceAudioSource == null)
+        {
+            // Create AudioSource for voice effects
+            voiceAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+        
+        // Configure AudioSource
+        voiceAudioSource.loop = true; // Voice plays continuously during dialogue
+        voiceAudioSource.volume = voiceVolume;
+        voiceAudioSource.playOnAwake = false;
+        voiceAudioSource.priority = 128; // Lower priority to avoid conflicts
+        
+        audioInitialized = true;
+        Debug.Log("DialogueManager audio initialized successfully");
     }
     
     void Update()
@@ -87,6 +107,12 @@ public class DialogueManager : MonoBehaviour
         {
             Debug.LogWarning("Dialogue is empty or null!");
             return;
+        }
+        
+        // Ensure audio is initialized
+        if (!audioInitialized)
+        {
+            InitializeAudioSource();
         }
         
         currentDialogue = dialogue;
@@ -144,6 +170,12 @@ public class DialogueManager : MonoBehaviour
     
     void PlayVoiceForSpeaker(string speakerName)
     {
+        // Don't play audio if not initialized
+        if (!audioInitialized || voiceAudioSource == null)
+        {
+            return;
+        }
+        
         AudioClip voiceClip = null;
         
         // Determine which voice to use based on speaker name
@@ -159,12 +191,19 @@ public class DialogueManager : MonoBehaviour
             voiceClip = russellVoiceSFX;
         }
         
-        // Play the voice clip
+        // Play the voice clip with additional safety checks
         if (voiceClip != null && voiceAudioSource != null)
         {
-            voiceAudioSource.clip = voiceClip;
-            voiceAudioSource.Play();
-            Debug.Log("Playing voice for: " + speakerName);
+            try
+            {
+                voiceAudioSource.clip = voiceClip;
+                voiceAudioSource.Play();
+                Debug.Log("Playing voice for: " + speakerName);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("Failed to play voice audio: " + e.Message);
+            }
         }
         else
         {
@@ -176,7 +215,14 @@ public class DialogueManager : MonoBehaviour
     {
         if (voiceAudioSource != null && voiceAudioSource.isPlaying)
         {
-            voiceAudioSource.Stop();
+            try
+            {
+                voiceAudioSource.Stop();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("Failed to stop voice audio: " + e.Message);
+            }
         }
     }
     
@@ -306,5 +352,11 @@ public class DialogueManager : MonoBehaviour
         {
             voiceAudioSource.volume = voiceVolume;
         }
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up audio when destroyed
+        StopVoiceAudio();
     }
 }
