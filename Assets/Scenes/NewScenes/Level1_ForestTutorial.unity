@@ -247,8 +247,8 @@ GameObject:
   - component: {fileID: 26348670}
   - component: {fileID: 26348669}
   - component: {fileID: 26348668}
-  - component: {fileID: 26348667}
   - component: {fileID: 26348666}
+  - component: {fileID: 26348671}
   m_Layer: 0
   m_Name: MeleeGoblin
   m_TagString: Untagged
@@ -298,39 +298,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
---- !u!114 &26348667
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 26348664}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d589d36517a474b59979a4edfe39edaa, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MeleeGoblin
-  pointA: {x: -10.9, y: 1.2, z: 55.92}
-  pointB: {x: 5, y: 1.2, z: 55.92}
-  patrolSpeed: 2
-  emergencyEdgeCheckDistance: 1
-  groundCheckDepth: 2
-  chaseSpeed: 4
-  chaseRange: 5
-  attackRange: 1.5
-  damage: 1
-  knockbackForce: 5
-  attackCooldown: 1
-  jumpKillThreshold: 0.3
-  jumpKillVelocityThreshold: -1
-  patrolColor: {r: 0, g: 1, b: 0, a: 1}
-  chaseColor: {r: 1, g: 0, b: 0, a: 1}
-  scoreValue: 10
-  alertSFX: {fileID: 8300000, guid: 710d5ce61e6bf4f18b93f924f525ee44, type: 3}
-  chaseSFX: {fileID: 8300000, guid: 04907e1abc8b24fdc8093c78b138f275, type: 3}
-  alertVolume: 0.7
-  chaseVolume: 0.5
-  playerObject: {fileID: 377626227}
 --- !u!65 &26348668
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -408,6 +375,41 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 26348664}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &26348671
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 26348664}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d589d36517a474b59979a4edfe39edaa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeGoblin
+  pointA: {x: -10.9, y: 0.515, z: 55.92}
+  pointB: {x: -4.9, y: 0.515, z: 55.92}
+  patrolSpeed: 2
+  waypointReachedDistance: 0.3
+  chaseSpeed: 4
+  chaseRange: 5
+  attackRange: 1.5
+  damage: 1
+  knockbackForce: 10
+  attackCooldown: 1
+  jumpKillHeightThreshold: 0.5
+  jumpKillVelocityThreshold: -2
+  jumpKillBounceForce: 8
+  useContactPointDetection: 0
+  patrolColor: {r: 0, g: 1, b: 0, a: 1}
+  chaseColor: {r: 1, g: 0, b: 0, a: 1}
+  scoreValue: 10
+  alertSFX: {fileID: 8300000, guid: 710d5ce61e6bf4f18b93f924f525ee44, type: 3}
+  chaseSFX: {fileID: 8300000, guid: 04907e1abc8b24fdc8093c78b138f275, type: 3}
+  deathSFX: {fileID: 0}
+  alertVolume: 0.7
+  chaseVolume: 0.5
+  playerObject: {fileID: 0}
 --- !u!4 &57178797 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 186ad8f063dbf430da4d56ebc0cb14e0, type: 3}
@@ -5980,21 +5982,23 @@ MonoBehaviour:
   pointA: {x: -3, y: 0.5, z: 0}
   pointB: {x: 3, y: 0.5, z: 0}
   patrolSpeed: 2
-  emergencyEdgeCheckDistance: 1
-  groundCheckDepth: 2
+  waypointReachedDistance: 0.3
   chaseSpeed: 4
   chaseRange: 5
   attackRange: 1.5
   damage: 1
   knockbackForce: 5
   attackCooldown: 1
-  jumpKillThreshold: 0.3
+  jumpKillHeightThreshold: 0.5
   jumpKillVelocityThreshold: -1
+  jumpKillBounceForce: 8
+  useContactPointDetection: 0
   patrolColor: {r: 0, g: 1, b: 0, a: 1}
   chaseColor: {r: 1, g: 0, b: 0, a: 1}
   scoreValue: 10
   alertSFX: {fileID: 8300000, guid: 710d5ce61e6bf4f18b93f924f525ee44, type: 3}
   chaseSFX: {fileID: 8300000, guid: 04907e1abc8b24fdc8093c78b138f275, type: 3}
+  deathSFX: {fileID: 0}
   alertVolume: 0.7
   chaseVolume: 0.5
   playerObject: {fileID: 0}
@@ -6161,7 +6165,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1174238578
 Transform:
   m_ObjectHideFlags: 0

@@ -6,11 +6,7 @@ public class MeleeGoblin : MonoBehaviour
     public Vector3 pointA;
     public Vector3 pointB;
     public float patrolSpeed = 2f;
-    
-    [Header("Edge Detection - SAFETY BACKUP")]
-    [Tooltip("Emergency edge detection - only triggers if goblin goes beyond patrol points")]
-    public float emergencyEdgeCheckDistance = 1.0f;
-    public float groundCheckDepth = 2.0f;
+    public float waypointReachedDistance = 0.3f; // Increased threshold for reaching waypoints
     
     [Header("Chase Settings")]
     public float chaseSpeed = 4f;
@@ -23,8 +19,14 @@ public class MeleeGoblin : MonoBehaviour
     public float attackCooldown = 1f;
     
     [Header("Jump Kill Settings")]
-    public float jumpKillThreshold = 0.3f;
+    [Tooltip("Minimum height difference for jump kill (player bottom - goblin top)")]
+    public float jumpKillHeightThreshold = 0.2f;
+    [Tooltip("Maximum downward velocity required for jump kill (negative value)")]
     public float jumpKillVelocityThreshold = -1f;
+    [Tooltip("How much the player bounces after jump kill")]
+    public float jumpKillBounceForce = 8f;
+    [Tooltip("If true, uses contact point detection. If false, uses simple height comparison")]
+    public bool useContactPointDetection = false;
     
     [Header("Colors")]
     public Color patrolColor = Color.green;
@@ -36,6 +38,7 @@ public class MeleeGoblin : MonoBehaviour
     [Header("Sound Effects")]
     public AudioClip alertSFX;
     public AudioClip chaseSFX;
+    public AudioClip deathSFX;
     public float alertVolume = 0.7f;
     public float chaseVolume = 0.5f;
     
@@ -51,7 +54,6 @@ public class MeleeGoblin : MonoBehaviour
     private Rigidbody rb;
     private bool canAttack = true;
     private float attackTimer = 0f;
-    private Vector3 startPosition;
     private PlayerHealth playerHealth;
     
     private AudioSource alertAudioSource;
@@ -59,19 +61,30 @@ public class MeleeGoblin : MonoBehaviour
     private bool hasPlayedAlert = false;
     
     private bool isDead = false;
+    private bool isMovingToB = true; // Track which direction we're patrolling
+    private bool playerJustKilledGoblin = false; // Prevent damage during jump kill
     
     void Start()
     {
-        startPosition = transform.position;
-        
-        // Start moving toward the closest point
+        // Initialize patrol direction
         float distToA = Vector3.Distance(transform.position, pointA);
         float distToB = Vector3.Distance(transform.position, pointB);
-        currentTarget = (distToA < distToB) ? pointA : pointB;
+        
+        if (distToA < distToB)
+        {
+            currentTarget = pointB;
+            isMovingToB = true;
+        }
+        else
+        {
+            currentTarget = pointA;
+            isMovingToB = false;
+        }
         
         rend = GetComponent<Renderer>();
         rb = GetComponent<Rigidbody>();
         
+        // Find player
         if (playerObject == null)
         {
             playerObject = FindPlayerObject();
@@ -84,29 +97,31 @@ public class MeleeGoblin : MonoBehaviour
             
             if (playerHealth == null)
             {
-                Debug.LogWarning("PlayerHealth component not found on player!");
+                Debug.LogWarning("[MeleeGoblin] PlayerHealth component not found on player!");
             }
         }
         else
         {
-            Debug.LogError("Could not find player object!");
+            Debug.LogError("[MeleeGoblin] Could not find player object!");
         }
         
+        // Set initial color
         if (rend != null)
         {
             rend.material.color = patrolColor;
         }
         
+        // Configure Rigidbody
         if (rb != null)
         {
             rb.constraints = RigidbodyConstraints.FreezeRotation;
+            rb.isKinematic = false; // Ensure physics works properly
         }
         
         InitializeAudioSources();
         
-        float patrolDistance = Vector3.Distance(pointA, pointB);
-        Debug.Log($"[MeleeGoblin] {gameObject.name} initialized - Patrol distance: {patrolDistance:F2} units");
-        Debug.Log($"[MeleeGoblin] Will continuously patrol between Point A and Point B");
+        Debug.Log($"[MeleeGoblin] {gameObject.name} initialized");
+        Debug.Log($"[MeleeGoblin] Starting patrol from {(isMovingToB ? "A to B" : "B to A")}");
     }
     
     void InitializeAudioSources()
@@ -126,7 +141,10 @@ public class MeleeGoblin : MonoBehaviour
         chaseAudioSource.minDistance = 5f;
         chaseAudioSource.maxDistance = 20f;
         
-        Debug.Log("[MeleeGoblin] Audio sources initialized on " + gameObject.name);
+        if (chaseSFX != null)
+        {
+            chaseAudioSource.clip = chaseSFX;
+        }
     }
     
     GameObject FindPlayerObject()
@@ -143,14 +161,11 @@ public class MeleeGoblin : MonoBehaviour
             return playerPhysics.gameObject;
         }
         
-        GameObject player = GameObject.Find("Player");
-        if (player != null) return player;
+        GameObject p = GameObject.Find("Player");
+        if (p != null) return p;
         
-        player = GameObject.Find("player");
-        if (player != null) return player;
-        
-        player = GameObject.Find("Capsule");
-        if (player != null && player.GetComponent<PlayerHealth>() != null) return player;
+        p = GameObject.Find("Capsule");
+        if (p != null && p.GetComponent<PlayerHealth>() != null) return p;
         
         return null;
     }
@@ -159,6 +174,7 @@ public class MeleeGoblin : MonoBehaviour
     {
         if (player == null || isDead) return;
         
+        // Update attack cooldown
         if (!canAttack)
         {
             attackTimer += Time.deltaTime;
@@ -172,11 +188,16 @@ public class MeleeGoblin : MonoBehaviour
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
         bool playerIsInvincible = (playerHealth != null && playerHealth.IsInvincible());
         
+        // Don't attack if player just killed this goblin (prevents damage during jump kill)
+        if (playerJustKilledGoblin) return;
+        
+        // State machine
         switch (currentState)
         {
             case GoblinState.Patrol:
                 Patrol();
                 
+                // Transition to Chase if player is in range and not invincible
                 if (!playerIsInvincible && distanceToPlayer <= chaseRange)
                 {
                     ChangeState(GoblinState.Chase);
@@ -184,6 +205,7 @@ public class MeleeGoblin : MonoBehaviour
                 break;
                 
             case GoblinState.Chase:
+                // Return to patrol if player becomes invincible
                 if (playerIsInvincible)
                 {
                     ChangeState(GoblinState.Patrol);
@@ -192,10 +214,12 @@ public class MeleeGoblin : MonoBehaviour
                 
                 ChasePlayer();
                 
+                // Transition to Attack if in attack range
                 if (distanceToPlayer <= attackRange && canAttack)
                 {
                     ChangeState(GoblinState.Attack);
                 }
+                // Return to Patrol if player is too far
                 else if (distanceToPlayer > chaseRange)
                 {
                     ChangeState(GoblinState.Patrol);
@@ -210,91 +234,122 @@ public class MeleeGoblin : MonoBehaviour
     
     void Patrol()
     {
-        // Move toward current target point
-        transform.position = Vector3.MoveTowards(
-            transform.position, 
-            currentTarget, 
-            patrolSpeed * Time.deltaTime
-        );
+        // Calculate direction to current target
+        Vector3 direction = (currentTarget - transform.position).normalized;
         
-        // Check if reached the target point
+        // Move toward target using Rigidbody for consistent physics
+        if (rb != null)
+        {
+            Vector3 moveVelocity = direction * patrolSpeed;
+            moveVelocity.y = rb.linearVelocity.y; // Preserve vertical velocity
+            rb.linearVelocity = moveVelocity;
+        }
+        else
+        {
+            // Fallback to transform movement
+            transform.position = Vector3.MoveTowards(
+                transform.position, 
+                currentTarget, 
+                patrolSpeed * Time.deltaTime
+            );
+        }
+        
+        // Rotate to face movement direction
+        if (direction != Vector3.zero)
+        {
+            Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+        }
+        
+        // Check if we've reached the waypoint
         float distanceToTarget = Vector3.Distance(transform.position, currentTarget);
         
-        if (distanceToTarget < 0.1f)
+        if (distanceToTarget <= waypointReachedDistance)
         {
-            // Reached target - switch to the other point
-            if (currentTarget == pointA)
+            // Switch to the other patrol point and continue patrolling
+            if (isMovingToB)
             {
-                currentTarget = pointB;
-                Debug.Log($"[MeleeGoblin] {gameObject.name} reached Point A, now heading to Point B");
+                currentTarget = pointA;
+                isMovingToB = false;
+                Debug.Log($"[MeleeGoblin] {gameObject.name} reached Point B, now heading back to Point A");
             }
             else
             {
-                currentTarget = pointA;
-                Debug.Log($"[MeleeGoblin] {gameObject.name} reached Point B, now heading to Point A");
+                currentTarget = pointB;
+                isMovingToB = true;
+                Debug.Log($"[MeleeGoblin] {gameObject.name} reached Point A, now heading back to Point B");
             }
-        }
-        
-        // Emergency edge detection (backup safety)
-        // Only checks if goblin somehow goes beyond patrol points
-        float distanceFromA = Vector3.Distance(transform.position, pointA);
-        float distanceFromB = Vector3.Distance(transform.position, pointB);
-        float patrolPathLength = Vector3.Distance(pointA, pointB);
-        
-        // If goblin is further from both points than the patrol path length, something's wrong
-        if (distanceFromA > patrolPathLength * 1.5f && distanceFromB > patrolPathLength * 1.5f)
-        {
-            Debug.LogWarning($"[MeleeGoblin] {gameObject.name} went off patrol path! Resetting to closest point.");
-            // Teleport back to closest point
-            currentTarget = (distanceFromA < distanceFromB) ? pointA : pointB;
-            transform.position = currentTarget;
+            
+            // Immediately start moving toward the new target (no pause)
+            direction = (currentTarget - transform.position).normalized;
+            if (rb != null)
+            {
+                Vector3 moveVelocity = direction * patrolSpeed;
+                moveVelocity.y = rb.linearVelocity.y;
+                rb.linearVelocity = moveVelocity;
+            }
         }
     }
     
     void ChasePlayer()
     {
         Vector3 direction = (player.position - transform.position).normalized;
-        transform.position = Vector3.MoveTowards(
-            transform.position, 
-            player.position, 
-            chaseSpeed * Time.deltaTime
-        );
         
+        // Move toward player using Rigidbody
+        if (rb != null)
+        {
+            Vector3 moveVelocity = direction * chaseSpeed;
+            moveVelocity.y = rb.linearVelocity.y; // Preserve vertical velocity
+            rb.linearVelocity = moveVelocity;
+        }
+        else
+        {
+            transform.position = Vector3.MoveTowards(
+                transform.position, 
+                player.position, 
+                chaseSpeed * Time.deltaTime
+            );
+        }
+        
+        // Rotate to face player
         if (direction != Vector3.zero)
         {
             Quaternion lookRotation = Quaternion.LookRotation(new Vector3(direction.x, 0, direction.z));
-            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 5f);
+            transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 8f);
         }
     }
     
     void AttackPlayer()
     {
+        // Don't attack invincible player
         if (playerHealth != null && playerHealth.IsInvincible())
         {
             ChangeState(GoblinState.Patrol);
             return;
         }
         
-        if (playerHealth != null)
+        // Check if we should still attack (player might have moved)
+        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        
+        if (distanceToPlayer > attackRange)
         {
-            playerHealth.TakeDamage();
-            
-            Vector3 knockbackDirection = (player.position - transform.position).normalized;
-            knockbackDirection.y = 0.3f;
-            knockbackDirection.Normalize();
-            
-            Rigidbody playerRb = player.GetComponent<Rigidbody>();
-            if (playerRb != null)
-            {
-                playerRb.linearVelocity = Vector3.zero;
-                playerRb.AddForce(knockbackDirection * knockbackForce, ForceMode.Impulse);
-            }
+            // Player moved out of range
+            ChangeState(GoblinState.Chase);
+            return;
         }
         
+        // NOTE: Damage is now handled in OnCollisionEnter to prevent
+        // damage when player jumps on goblin's head
+        // This method now just transitions states
+        
+        Debug.Log("[MeleeGoblin] Attack state - waiting for collision or range change");
+        
+        // Start attack cooldown
         canAttack = false;
         attackTimer = 0f;
         
-        ChangeState(GoblinState.Patrol);
+        // Return to chase
+        ChangeState(GoblinState.Chase);
     }
     
     void ChangeState(GoblinState newState)
@@ -302,6 +357,28 @@ public class MeleeGoblin : MonoBehaviour
         GoblinState oldState = currentState;
         currentState = newState;
         
+        // When returning to patrol from chase, resume at nearest patrol point
+        if (newState == GoblinState.Patrol && oldState != GoblinState.Patrol)
+        {
+            // Find which patrol point is closer
+            float distToA = Vector3.Distance(transform.position, pointA);
+            float distToB = Vector3.Distance(transform.position, pointB);
+            
+            if (distToA < distToB)
+            {
+                currentTarget = pointB;
+                isMovingToB = true;
+                Debug.Log($"[MeleeGoblin] Resuming patrol - heading to Point B from current position");
+            }
+            else
+            {
+                currentTarget = pointA;
+                isMovingToB = false;
+                Debug.Log($"[MeleeGoblin] Resuming patrol - heading to Point A from current position");
+            }
+        }
+        
+        // Update visual feedback
         if (rend != null)
         {
             switch (currentState)
@@ -321,32 +398,30 @@ public class MeleeGoblin : MonoBehaviour
     
     void HandleStateAudio(GoblinState oldState, GoblinState newState)
     {
+        // Entering chase state
         if (oldState == GoblinState.Patrol && newState == GoblinState.Chase)
         {
+            // Play alert sound once
             if (!hasPlayedAlert && alertSFX != null && alertAudioSource != null)
             {
                 alertAudioSource.PlayOneShot(alertSFX);
                 hasPlayedAlert = true;
-                Debug.Log("[MeleeGoblin] Played alert sound on " + gameObject.name);
             }
             
+            // Start chase music loop
             if (chaseSFX != null && chaseAudioSource != null && !chaseAudioSource.isPlaying)
             {
-                if (chaseAudioSource.clip == null)
-                {
-                    chaseAudioSource.clip = chaseSFX;
-                }
                 chaseAudioSource.Play();
-                Debug.Log("[MeleeGoblin] Started chase sound on " + gameObject.name);
             }
         }
         
+        // Leaving chase state
         if (newState == GoblinState.Patrol && (oldState == GoblinState.Chase || oldState == GoblinState.Attack))
         {
+            // Stop chase music
             if (chaseAudioSource != null && chaseAudioSource.isPlaying)
             {
                 chaseAudioSource.Stop();
-                Debug.Log("[MeleeGoblin] Stopped chase sound on " + gameObject.name);
             }
             
             hasPlayedAlert = false;
@@ -357,52 +432,165 @@ public class MeleeGoblin : MonoBehaviour
     {
         if (isDead) return;
         
+        // Check if it's the player
         PlayerHealth hitPlayerHealth = collision.gameObject.GetComponent<PlayerHealth>();
         
         if (hitPlayerHealth != null)
         {
+            // FIRST: Check for jump kill BEFORE any damage is dealt
+            // This ensures jump kill detection happens before attack logic
+            
+            // Get player's Rigidbody to check velocity
             Rigidbody playerRb = collision.gameObject.GetComponent<Rigidbody>();
             
-            float playerY = collision.transform.position.y;
-            float goblinY = transform.position.y;
-            float yDifference = playerY - goblinY;
+            // Get the bounds of both objects to calculate actual height difference
+            Bounds playerBounds = GetObjectBounds(collision.gameObject);
+            Bounds goblinBounds = GetObjectBounds(gameObject);
             
+            // Calculate the bottom of the player and top of the goblin
+            float playerBottom = playerBounds.min.y;
+            float goblinTop = goblinBounds.max.y;
+            
+            // Height difference (positive if player bottom is above goblin top)
+            float heightDifference = playerBottom - goblinTop;
+            
+            // Check if player is falling downward
             bool playerIsFalling = false;
+            float playerVerticalVelocity = 0f;
+            
             if (playerRb != null)
             {
-                playerIsFalling = playerRb.linearVelocity.y < jumpKillVelocityThreshold;
+                playerVerticalVelocity = playerRb.linearVelocity.y;
+                playerIsFalling = playerVerticalVelocity < jumpKillVelocityThreshold;
             }
             
-            bool hitFromAbove = false;
-            foreach (ContactPoint contact in collision.contacts)
+            // Check collision contact points for top hit (optional method)
+            bool hitFromTop = false;
+            Vector3 averageContactPoint = Vector3.zero;
+            
+            if (collision.contacts.Length > 0)
             {
-                if (contact.normal.y < -0.5f)
+                foreach (ContactPoint contact in collision.contacts)
                 {
-                    hitFromAbove = true;
-                    break;
+                    averageContactPoint += contact.point;
+                    
+                    // If contact normal points downward, player hit from above
+                    // We use a more lenient threshold for cubes
+                    if (contact.normal.y < -0.1f)
+                    {
+                        hitFromTop = true;
+                    }
+                }
+                averageContactPoint /= collision.contacts.Length;
+                
+                // Additional check: is the contact point above the goblin's center?
+                if (averageContactPoint.y > transform.position.y)
+                {
+                    hitFromTop = true;
                 }
             }
             
-            Debug.Log($"[MeleeGoblin] Collision - Y Diff: {yDifference:F2}, Player Falling: {playerIsFalling}, Hit From Above: {hitFromAbove}");
+            // Debug information
+            Debug.Log($"[MeleeGoblin] === COLLISION DETECTION ===");
+            Debug.Log($"  Goblin State: {currentState}");
+            Debug.Log($"  Player Bottom Y: {playerBottom:F2}");
+            Debug.Log($"  Goblin Top Y: {goblinTop:F2}");
+            Debug.Log($"  Height Diff (bottom-top): {heightDifference:F2} (threshold: {jumpKillHeightThreshold})");
+            Debug.Log($"  Player Velocity Y: {playerVerticalVelocity:F2} (threshold: {jumpKillVelocityThreshold})");
+            Debug.Log($"  Player Falling: {playerIsFalling}");
+            Debug.Log($"  Hit From Top: {hitFromTop}");
+            Debug.Log($"  Average Contact Y: {averageContactPoint.y:F2} vs Goblin Center Y: {transform.position.y:F2}");
             
-            if (hitFromAbove && playerIsFalling && yDifference > jumpKillThreshold)
+            // Jump kill conditions:
+            // METHOD 1: Simple height + velocity check (more reliable for cubes)
+            bool simpleCheck = (heightDifference > -jumpKillHeightThreshold) && playerIsFalling;
+            
+            // METHOD 2: Contact point detection
+            bool contactCheck = hitFromTop && playerIsFalling;
+            
+            // Use the selected method or combine both
+            bool isJumpKill = useContactPointDetection ? contactCheck : simpleCheck;
+            
+            Debug.Log($"  Simple Check: {simpleCheck}");
+            Debug.Log($"  Contact Check: {contactCheck}");
+            Debug.Log($"  Final Result: {(isJumpKill ? "JUMP KILL!" : "Normal collision")}");
+            Debug.Log($"================================");
+            
+            // CRITICAL: Process jump kill FIRST before any damage logic
+            if (isJumpKill)
             {
-                Debug.Log("[MeleeGoblin] Player jumped on head - Goblin defeated!");
+                Debug.Log("[MeleeGoblin] ✓ JUMP KILL! Player defeated goblin!");
                 
+                // Set flag to prevent damage from being dealt
+                playerJustKilledGoblin = true;
+                
+                // Bounce player upward
                 if (playerRb != null)
                 {
                     Vector3 bounceVelocity = playerRb.linearVelocity;
-                    bounceVelocity.y = 5f;
+                    bounceVelocity.y = jumpKillBounceForce;
                     playerRb.linearVelocity = bounceVelocity;
                 }
                 
+                // Kill the goblin immediately - this prevents any attack logic from running
                 Die();
+                
+                // RETURN HERE - don't process any attack logic
+                return;
+            }
+            
+            // If we reach here, it's NOT a jump kill - goblin can attack
+            Debug.Log("[MeleeGoblin] ✗ No jump kill - checking if goblin should attack");
+            
+            // Only deal damage if goblin is in attack range AND can attack
+            // This prevents damage during normal movement/chasing
+            float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+            
+            if (distanceToPlayer <= attackRange && canAttack && !hitPlayerHealth.IsInvincible())
+            {
+                Debug.Log("[MeleeGoblin] Goblin dealing damage to player (side/front collision)");
+                
+                hitPlayerHealth.TakeDamage();
+                
+                // Apply knockback
+                Vector3 knockbackDirection = (collision.transform.position - transform.position).normalized;
+                knockbackDirection.y = 0.3f;
+                knockbackDirection.Normalize();
+                
+                if (playerRb != null)
+                {
+                    playerRb.linearVelocity = Vector3.zero;
+                    playerRb.AddForce(knockbackDirection * knockbackForce, ForceMode.Impulse);
+                }
+                
+                // Start cooldown
+                canAttack = false;
+                attackTimer = 0f;
             }
             else
             {
-                Debug.Log("[MeleeGoblin] Player hit from side/front - No jump kill");
+                Debug.Log("[MeleeGoblin] Collision detected but no damage dealt (out of attack range or on cooldown)");
             }
         }
+    }
+    
+    // Helper method to get bounds of an object
+    Bounds GetObjectBounds(GameObject obj)
+    {
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            return renderer.bounds;
+        }
+        
+        Collider collider = obj.GetComponent<Collider>();
+        if (collider != null)
+        {
+            return collider.bounds;
+        }
+        
+        // Fallback to just using position
+        return new Bounds(obj.transform.position, Vector3.one);
     }
     
     void Die()
@@ -410,18 +598,28 @@ public class MeleeGoblin : MonoBehaviour
         if (isDead) return;
         
         isDead = true;
-        Debug.Log("[MeleeGoblin] Goblin defeated!");
+        Debug.Log($"[MeleeGoblin] {gameObject.name} defeated!");
         
+        // Stop chase sound
         if (chaseAudioSource != null && chaseAudioSource.isPlaying)
         {
             chaseAudioSource.Stop();
         }
         
+        // Play death sound if available
+        if (deathSFX != null)
+        {
+            AudioSource.PlayClipAtPoint(deathSFX, transform.position);
+        }
+        
+        // Award score
         if (ScoreManager.instance != null)
         {
             ScoreManager.instance.AddScore(scoreValue);
+            Debug.Log($"[MeleeGoblin] Added {scoreValue} points to score");
         }
         
+        // Destroy goblin
         Destroy(gameObject);
     }
     
@@ -463,6 +661,7 @@ public class MeleeGoblin : MonoBehaviour
     
     void OnDestroy()
     {
+        // Clean up audio
         if (chaseAudioSource != null && chaseAudioSource.isPlaying)
         {
             chaseAudioSource.Stop();
