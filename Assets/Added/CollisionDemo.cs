@@ -3,7 +3,7 @@ using UnityEngine;
 public class CollisionDemo : MonoBehaviour
 {
     private PlayerHealth playerHealth;
-    public int coinValue = 1; // Points per coin
+    public int coinValue = 5; // Changed from 1 to 5 points per coin
     
     [Header("Sound Effects")]
     public AudioClip coinCollectSFX;
@@ -54,7 +54,7 @@ public class CollisionDemo : MonoBehaviour
         }
         else if (collision.gameObject.name.Contains("Coin"))
         {
-            Debug.Log("You collected a coin!");
+            Debug.Log("You collected a coin worth " + coinValue + " points!");
             
             // Play coin collection sound
             PlayCoinCollectSound();

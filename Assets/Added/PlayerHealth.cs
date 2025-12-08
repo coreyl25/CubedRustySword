@@ -78,6 +78,12 @@ public class PlayerHealth : MonoBehaviour
         currentLives--;
         Debug.Log("Lives remaining: " + currentLives);
         
+        // Play hurt sound when player takes damage
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.PlayPlayerHurt();
+        }
+        
         // Activate invincibility
         isInvincible = true;
         invincibilityTimer = 0f;
@@ -115,6 +121,12 @@ public class PlayerHealth : MonoBehaviour
     void GameOver()
     {
         Debug.Log("GAME OVER!");
+        
+        // Play death sound when player dies
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.PlayPlayerDeath();
+        }
         
         // End invincibility
         isInvincible = false;

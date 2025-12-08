@@ -3,7 +3,7 @@ using UnityEngine.SceneManagement;
 
 public class PauseMenu : MonoBehaviour
 {
-    public static PauseMenu instance; // Singleton to ensure only one pause menu
+    public static PauseMenu instance;
     public static bool GameIsPaused = false;
     public GameObject pauseMenuUI;
     
@@ -64,15 +64,8 @@ public class PauseMenu : MonoBehaviour
         }
     }
     
-    // Update is called once per frame
     void Update()
     {
-        // Don't allow pausing if game has ended
-        if (GameManager.instance != null)
-        {
-            
-        }
-        
         // Check for Escape key press
         if (Input.GetKeyDown(KeyCode.Escape))
         {
@@ -102,6 +95,13 @@ public class PauseMenu : MonoBehaviour
             UIManager.instance.HidePauseMenu();
         }
         
+        // Resume the music
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.ResumeMusic();
+            Debug.Log("Music resumed");
+        }
+        
         // Unfreeze time
         Time.timeScale = 1f;
         GameIsPaused = false;
@@ -126,6 +126,13 @@ public class PauseMenu : MonoBehaviour
             UIManager.instance.ShowPauseMenu();
         }
         
+        // Pause the music
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.PauseMusic();
+            Debug.Log("Music paused");
+        }
+        
         // Freeze time completely
         Time.timeScale = 0f;
         GameIsPaused = true;
@@ -134,6 +141,12 @@ public class PauseMenu : MonoBehaviour
     public void QuitToMainMenu()
     {
         Debug.Log("Returning to Main Menu");
+        
+        // Stop the music before returning to main menu
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.StopMusic();
+        }
         
         // Unfreeze time before loading new scene
         Time.timeScale = 1f;

@@ -12,7 +12,10 @@ public class UIManager : MonoBehaviour
     [Header("Panels")]
     public GameObject winPanel;
     public GameObject gameOverPanel;
-    public GameObject pauseMenuPanel; // NEW: Reference to pause menu panel
+    public GameObject pauseMenuPanel;
+    
+    [Header("Next Level")]
+    public string nextLevelSceneName = "Level2"; // Set this in Inspector for each level
     
     void Awake()
     {
@@ -61,6 +64,7 @@ public class UIManager : MonoBehaviour
         if (winPanel != null)
         {
             winPanel.SetActive(true);
+            Debug.Log("Win panel displayed!");
         }
     }
     
@@ -118,5 +122,29 @@ public class UIManager : MonoBehaviour
         
         // Load the main menu scene
         SceneManager.LoadScene("MainMenu");
+    }
+    
+    // NEW: Load next level
+    public void LoadNextLevel()
+    {
+        // Unpause game first
+        Time.timeScale = 1f;
+        
+        // Make sure pause state is reset
+        if (PauseMenu.instance != null)
+        {
+            PauseMenu.GameIsPaused = false;
+        }
+        
+        // Check if next level name is set
+        if (string.IsNullOrEmpty(nextLevelSceneName))
+        {
+            Debug.LogError("Next level scene name not set in UIManager!");
+            return;
+        }
+        
+        // Load the next level
+        Debug.Log("Loading next level: " + nextLevelSceneName);
+        SceneManager.LoadScene(nextLevelSceneName);
     }
 }
